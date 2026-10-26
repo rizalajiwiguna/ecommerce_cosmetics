@@ -5,17 +5,40 @@
 -- 09. CUSTOMER BEHAVIOR
 -- =========================================================
 --
+-- Project:
+-- BeautyCommerce — Customer Journey, Conversion
+-- & Retention Analytics
+--
+-- Depends on:
+-- portofolio_2.mv_events_sessionized
+-- portofolio_2.mv_session_funnel
+-- portofolio_2.mv_analytical_session_summary
+-- portofolio_2.mv_customer_purchase_summary
+--
+-- Produces:
+-- portofolio_2.mv_user_behavior_summary
+-- portofolio_2.mv_buyer_first_purchase_journey
+-- portofolio_2.mv_buyer_prepurchase_behavior
+--
+-- Analytical timezone:
+-- UTC
+--
 -- Purpose:
 -- Compare observed behavioral intensity across users who
 -- purchase and users who do not, then examine the journey
 -- toward each buyer's first observed purchase.
 --
--- Key distinction:
+-- Important:
 -- "Buyer" means a user with at least one observed purchase
--- during the dataset window.
+-- during the available dataset window.
 --
 -- First observed purchase != first-ever purchase.
 --
+-- =========================================================
+
+
+-- =========================================================
+-- USER BEHAVIOR SUMMARY
 -- =========================================================
 
 
@@ -23,7 +46,24 @@
 -- 09.1 All-user behavior summary
 -- ---------------------------------------------------------
 -- Grain:
--- 1 row = 1 user in the valid analytical-session layer
+-- 1 row = 1 user in the valid analytical-session layer.
+--
+-- Behavior segments:
+--
+-- Buyer
+-- → at least one observed purchase.
+--
+-- Cart Interaction — No Purchase
+-- → no purchase, but at least one cart OR remove_from_cart
+--   event was observed.
+--
+-- View Only — No Purchase
+-- → observed view activity without cart-related interaction
+--   or purchase.
+--
+-- "Cart Interaction" therefore includes remove_from_cart
+-- behavior even when no cart event appears elsewhere in the
+-- user's observed history.
 
 CREATE MATERIALIZED VIEW
     portofolio_2.mv_user_behavior_summary AS
@@ -32,7 +72,8 @@ WITH session_behavior AS (
     SELECT
         user_id,
 
-        COUNT(*) AS analytical_sessions,
+        COUNT(*)
+            AS analytical_sessions,
 
         MIN(session_start_utc)
             AS first_seen_utc,
@@ -65,7 +106,8 @@ event_behavior AS (
     SELECT
         user_id,
 
-        COUNT(*) AS total_events,
+        COUNT(*)
+            AS total_events,
 
         COUNT(*) FILTER (
             WHERE event_type = 'view'
@@ -94,18 +136,25 @@ event_behavior AS (
             )
         ) AS active_months,
 
-        COUNT(DISTINCT product_id)
-            AS distinct_products_interacted,
+        COUNT(
+            DISTINCT product_id
+        ) AS distinct_products_interacted,
 
-        COUNT(DISTINCT product_id) FILTER (
+        COUNT(
+            DISTINCT product_id
+        ) FILTER (
             WHERE event_type = 'view'
         ) AS distinct_products_viewed,
 
-        COUNT(DISTINCT product_id) FILTER (
+        COUNT(
+            DISTINCT product_id
+        ) FILTER (
             WHERE event_type = 'cart'
         ) AS distinct_products_carted,
 
-        COUNT(DISTINCT product_id) FILTER (
+        COUNT(
+            DISTINCT product_id
+        ) FILTER (
             WHERE event_type = 'purchase'
         ) AS distinct_products_purchased
 
@@ -201,10 +250,12 @@ ANALYZE portofolio_2.mv_user_behavior_summary;
 -- ---------------------------------------------------------
 
 SELECT
-    COUNT(*) AS total_users,
+    COUNT(*)
+        AS total_users,
 
-    COUNT(DISTINCT user_id)
-        AS unique_users,
+    COUNT(
+        DISTINCT user_id
+    ) AS unique_users,
 
     COUNT(*) FILTER (
         WHERE is_buyer
@@ -214,11 +265,14 @@ SELECT
         WHERE NOT is_buyer
     ) AS non_buyers,
 
-    SUM(purchase_events)
-        AS total_purchase_events,
+    SUM(
+        purchase_events
+    ) AS total_purchase_events,
 
     ROUND(
-        SUM(observed_purchase_value),
+        SUM(
+            observed_purchase_value
+        ),
         2
     ) AS total_observed_purchase_value
 
@@ -240,31 +294,43 @@ FROM portofolio_2.mv_user_behavior_summary;
 SELECT
     behavior_segment,
 
-    COUNT(*) AS users,
+    COUNT(*)
+        AS users,
 
     ROUND(
-        100.0 * COUNT(*)
-        / SUM(COUNT(*)) OVER (),
+        100.0
+        * COUNT(*)
+        / SUM(
+            COUNT(*)
+        ) OVER (),
         2
     ) AS user_share_pct,
 
     ROUND(
-        AVG(analytical_sessions),
+        AVG(
+            analytical_sessions
+        ),
         2
     ) AS avg_sessions,
 
     ROUND(
-        AVG(active_days),
+        AVG(
+            active_days
+        ),
         2
     ) AS avg_active_days,
 
     ROUND(
-        AVG(distinct_products_viewed),
+        AVG(
+            distinct_products_viewed
+        ),
         2
     ) AS avg_products_viewed,
 
     ROUND(
-        AVG(distinct_products_carted),
+        AVG(
+            distinct_products_carted
+        ),
         2
     ) AS avg_products_carted
 
@@ -277,24 +343,29 @@ ORDER BY users DESC;
 -- Observed:
 --
 -- View Only — No Purchase
--- users = 1,237,210 (75.50%)
+-- users = 1,237,210
+-- share = 75.50%
 --
 -- Cart Interaction — No Purchase
--- users =   291,004 (17.76%)
+-- users = 291,004
+-- share = 17.76%
 --
 -- Buyer
--- users =   110,500 (6.74%)
+-- users = 110,500
+-- share = 6.74%
 
 
 -- ---------------------------------------------------------
 -- 09.4 Behavioral distribution
 -- ---------------------------------------------------------
--- Medians and P75 are preferred over averages because
--- behavioral activity is strongly right-skewed.
+-- Medians and P75 are reported because behavioral activity
+-- is strongly right-skewed.
 
 SELECT
     behavior_segment,
-    COUNT(*) AS users,
+
+    COUNT(*)
+        AS users,
 
     ROUND(
         PERCENTILE_CONT(0.50)
@@ -384,23 +455,24 @@ ORDER BY users DESC;
 
 -- Key observed medians:
 --
--- View Only:
--- sessions = 1
--- active days = 1
--- events = 1
+-- View Only — No Purchase
+-- sessions        = 1
+-- active days     = 1
+-- total events    = 1
 -- products viewed = 1
+-- products carted = 0
 --
--- Cart Interaction — No Purchase:
--- sessions = 1
--- active days = 1
--- events = 6
+-- Cart Interaction — No Purchase
+-- sessions        = 1
+-- active days     = 1
+-- total events    = 6
 -- products viewed = 2
 -- products carted = 2
 --
--- Buyer:
--- sessions = 5
--- active days = 3
--- events = 43
+-- Buyer
+-- sessions        = 5
+-- active days     = 3
+-- total events    = 43
 -- products viewed = 10
 -- products carted = 10
 
@@ -411,14 +483,17 @@ ORDER BY users DESC;
 
 SELECT
     behavior_segment,
-    COUNT(*) AS users,
+
+    COUNT(*)
+        AS users,
 
     COUNT(*) FILTER (
         WHERE analytical_sessions >= 2
     ) AS multi_session_users,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE analytical_sessions >= 2
         )
         / COUNT(*),
@@ -430,7 +505,8 @@ SELECT
     ) AS multi_day_users,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE active_days >= 2
         )
         / COUNT(*),
@@ -442,7 +518,8 @@ SELECT
     ) AS users_5plus_sessions,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE analytical_sessions >= 5
         )
         / COUNT(*),
@@ -456,14 +533,19 @@ GROUP BY behavior_segment
 ORDER BY users DESC;
 
 -- Observed multi-session share:
--- View Only                  = 27.60%
--- Cart Interaction           = 48.05%
--- Buyer                      = 82.30%
+-- View Only — No Purchase         = 27.60%
+-- Cart Interaction — No Purchase = 48.05%
+-- Buyer                           = 82.30%
+--
+-- Observed multi-day share:
+-- View Only — No Purchase         = 16.55%
+-- Cart Interaction — No Purchase = 35.55%
+-- Buyer                           = 67.57%
 --
 -- Observed 5+ session share:
--- View Only                  =  4.24%
--- Cart Interaction           = 18.58%
--- Buyer                      = 52.64%
+-- View Only — No Purchase         =  4.24%
+-- Cart Interaction — No Purchase = 18.58%
+-- Buyer                           = 52.64%
 
 
 -- =========================================================
@@ -477,8 +559,11 @@ ORDER BY users DESC;
 -- Grain:
 -- 1 row = 1 observed buyer
 --
--- "First purchase" here means first purchase observed within
--- the dataset window, NOT necessarily first-ever purchase.
+-- "First purchase" means first purchase observed within the
+-- available dataset window.
+--
+-- It must NOT be interpreted as the customer's first-ever
+-- purchase because earlier history is unavailable.
 
 CREATE MATERIALIZED VIEW
     portofolio_2.mv_buyer_first_purchase_journey AS
@@ -505,8 +590,9 @@ purchase_sessions AS (
         user_id,
         analytical_session_id,
 
-        MIN(event_time_utc)
-            AS first_purchase_in_session_utc
+        MIN(
+            event_time_utc
+        ) AS first_purchase_in_session_utc
 
     FROM portofolio_2.mv_events_sessionized
 
@@ -539,6 +625,7 @@ SELECT
     fp.user_id,
 
     ub.first_seen_utc,
+
     fp.first_purchase_utc,
     fp.first_purchase_session_id,
 
@@ -588,16 +675,20 @@ ANALYZE portofolio_2.mv_buyer_first_purchase_journey;
 -- ---------------------------------------------------------
 
 SELECT
-    COUNT(*) AS buyers,
+    COUNT(*)
+        AS buyers,
 
-    COUNT(DISTINCT user_id)
-        AS unique_buyers,
+    COUNT(
+        DISTINCT user_id
+    ) AS unique_buyers,
 
-    MIN(first_purchase_session_number)
-        AS min_purchase_session_number,
+    MIN(
+        first_purchase_session_number
+    ) AS min_purchase_session_number,
 
-    MIN(hours_to_first_observed_purchase)
-        AS min_hours_to_purchase
+    MIN(
+        hours_to_first_observed_purchase
+    ) AS min_hours_to_purchase
 
 FROM portofolio_2.mv_buyer_first_purchase_journey;
 
@@ -632,11 +723,15 @@ SELECT
         ELSE '11+ Sessions'
     END AS purchase_session_bucket,
 
-    COUNT(*) AS buyers,
+    COUNT(*)
+        AS buyers,
 
     ROUND(
-        100.0 * COUNT(*)
-        / SUM(COUNT(*)) OVER (),
+        100.0
+        * COUNT(*)
+        / SUM(
+            COUNT(*)
+        ) OVER (),
         2
     ) AS buyer_share_pct
 
@@ -645,7 +740,9 @@ FROM portofolio_2.mv_buyer_first_purchase_journey
 GROUP BY 1
 
 ORDER BY
-    MIN(first_purchase_session_number);
+    MIN(
+        first_purchase_session_number
+    );
 
 -- Observed:
 -- First Session   = 30.67%
@@ -654,6 +751,11 @@ ORDER BY
 -- 4–5 Sessions    = 13.19%
 -- 6–10 Sessions   = 13.56%
 -- 11+ Sessions    = 13.52%
+--
+-- Cumulative:
+-- <= 3 sessions  = 59.72%
+-- <= 5 sessions  = 72.91%
+-- <=10 sessions  = 86.47%
 
 
 -- ---------------------------------------------------------
@@ -694,23 +796,29 @@ SELECT
     ) AS p90_hours_to_purchase,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE hours_to_first_observed_purchase < 1
-        ) / COUNT(*),
+        )
+        / COUNT(*),
         2
     ) AS purchase_within_1_hour_pct,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE hours_to_first_observed_purchase < 24
-        ) / COUNT(*),
+        )
+        / COUNT(*),
         2
     ) AS purchase_within_24_hours_pct,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE days_to_first_observed_purchase < 7
-        ) / COUNT(*),
+        )
+        / COUNT(*),
         2
     ) AS purchase_within_7_days_pct
 
@@ -722,9 +830,12 @@ FROM portofolio_2.mv_buyer_first_purchase_journey;
 -- P75    =  243.11 hours
 -- P90    = 1008.58 hours
 --
--- Within 1 hour  = 38.26%
--- Within 24 hrs  = 57.49%
--- Within 7 days  = 71.54%
+-- Within 1 hour = 38.26%
+-- Within 24 hrs = 57.49%
+-- Within 7 days = 71.54%
+--
+-- The distribution indicates both fast observed conversion
+-- and a substantial extended-consideration tail.
 
 
 -- =========================================================
@@ -735,11 +846,14 @@ FROM portofolio_2.mv_buyer_first_purchase_journey;
 -- ---------------------------------------------------------
 -- 09.10 Buyer pre-purchase behavior
 -- ---------------------------------------------------------
--- Only events strictly before the first purchase timestamp
--- are included.
+-- Grain:
+-- 1 row = 1 observed buyer
 --
--- Events at the exact same timestamp as first purchase are
--- excluded because intrasecond ordering is unavailable.
+-- Only events STRICTLY BEFORE the first observed purchase
+-- timestamp are included.
+--
+-- Events at the exact same timestamp as the first purchase
+-- are excluded because intrasecond event order is unavailable.
 
 CREATE MATERIALIZED VIEW
     portofolio_2.mv_buyer_prepurchase_behavior AS
@@ -748,29 +862,41 @@ WITH pre_purchase AS (
     SELECT
         j.user_id,
 
-        COUNT(e.event_type)
-            AS pre_purchase_events,
+        COUNT(
+            e.event_type
+        ) AS pre_purchase_events,
 
-        COUNT(e.event_type) FILTER (
+        COUNT(
+            e.event_type
+        ) FILTER (
             WHERE e.event_type = 'view'
         ) AS pre_purchase_views,
 
-        COUNT(e.event_type) FILTER (
+        COUNT(
+            e.event_type
+        ) FILTER (
             WHERE e.event_type = 'cart'
         ) AS pre_purchase_carts,
 
-        COUNT(e.event_type) FILTER (
+        COUNT(
+            e.event_type
+        ) FILTER (
             WHERE e.event_type = 'remove_from_cart'
         ) AS pre_purchase_removes,
 
-        COUNT(DISTINCT e.analytical_session_id)
-            AS sessions_with_activity_before_purchase,
+        COUNT(
+            DISTINCT e.analytical_session_id
+        ) AS sessions_with_activity_before_purchase,
 
-        COUNT(DISTINCT e.product_id) FILTER (
+        COUNT(
+            DISTINCT e.product_id
+        ) FILTER (
             WHERE e.event_type = 'view'
         ) AS products_viewed_before_purchase,
 
-        COUNT(DISTINCT e.product_id) FILTER (
+        COUNT(
+            DISTINCT e.product_id
+        ) FILTER (
             WHERE e.event_type = 'cart'
         ) AS products_carted_before_purchase
 
@@ -778,7 +904,8 @@ WITH pre_purchase AS (
 
     LEFT JOIN portofolio_2.mv_events_sessionized e
         ON j.user_id = e.user_id
-       AND e.event_time_utc < j.first_purchase_utc
+       AND e.event_time_utc
+           < j.first_purchase_utc
 
     GROUP BY j.user_id
 )
@@ -828,10 +955,12 @@ ANALYZE portofolio_2.mv_buyer_prepurchase_behavior;
 -- ---------------------------------------------------------
 
 SELECT
-    COUNT(*) AS buyers,
+    COUNT(*)
+        AS buyers,
 
-    COUNT(DISTINCT user_id)
-        AS unique_buyers,
+    COUNT(
+        DISTINCT user_id
+    ) AS unique_buyers,
 
     COUNT(*) FILTER (
         WHERE pre_purchase_events = 0
@@ -850,34 +979,45 @@ SELECT
     ) AS buyers_with_prior_remove,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE had_prior_view
-        ) / COUNT(*),
+        )
+        / COUNT(*),
         2
     ) AS prior_view_share,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE had_prior_cart
-        ) / COUNT(*),
+        )
+        / COUNT(*),
         2
     ) AS prior_cart_share,
 
     ROUND(
-        100.0 * COUNT(*) FILTER (
+        100.0
+        * COUNT(*) FILTER (
             WHERE had_prior_remove
-        ) / COUNT(*),
+        )
+        / COUNT(*),
         2
     ) AS prior_remove_share
 
 FROM portofolio_2.mv_buyer_prepurchase_behavior;
 
 -- Observed:
--- buyers                 = 110,500
--- buyers_no_prior_event  =     598
--- prior view share       = 92.51%
--- prior cart share       = 98.74%
--- prior remove share     = 75.99%
+-- buyers                = 110,500
+-- buyers_no_prior_event =     598
+-- prior view share      = 92.51%
+-- prior cart share      = 98.74%
+-- prior remove share    = 75.99%
+--
+-- "No prior event" means no event was observed strictly
+-- before the first-purchase timestamp.
+--
+-- It should NOT be interpreted as confirmed direct purchase.
 
 
 -- ---------------------------------------------------------
@@ -936,30 +1076,40 @@ SELECT
 FROM portofolio_2.mv_buyer_prepurchase_behavior;
 
 -- Observed:
--- median pre-purchase events          = 25
--- P75 pre-purchase events             = 56
--- median products viewed before buy   = 6
--- P75 products viewed                 = 16
--- median products carted before buy   = 7
--- P75 products carted                 = 16
+-- median pre-purchase events        = 25
+-- P75 pre-purchase events           = 56
+-- median products viewed            = 6
+-- P75 products viewed               = 16
+-- median products carted            = 7
+-- P75 products carted               = 16
 
 
 -- =========================================================
 -- METHODOLOGICAL NOTES
 -- =========================================================
 --
--- 1. Buyer behavior is descriptive association, not causal
---    evidence that additional sessions cause purchase.
+-- 1. Buyer behavior is descriptive association.
+--    It does NOT prove that higher session frequency,
+--    activity days, or product interactions cause purchase.
 --
--- 2. Full buyer behavior contains activity both before and
---    after purchase; pre-purchase analysis is therefore
---    reported separately.
+-- 2. Full buyer behavior includes activity both before and
+--    after purchase. Pre-purchase behavior is therefore
+--    analyzed separately.
 --
--- 3. First observed purchase may not be the customer's
+-- 3. First observed purchase may not be a customer's
 --    first-ever purchase because activity before October
 --    2019 is unavailable.
 --
--- 4. A cart event may exist without a prior recorded view,
---    so product counts carted can exceed products viewed.
+-- 4. The observation window creates left-censoring for
+--    customers whose relationship with the business may have
+--    started before the dataset begins.
+--
+-- 5. products_carted_before_purchase can exceed
+--    products_viewed_before_purchase because cart activity
+--    can occur without a recorded prior view.
+--
+-- 6. The 598 buyers with no event strictly before their first
+--    observed purchase timestamp are not automatically
+--    classified as direct-purchase customers.
 --
 -- =========================================================
