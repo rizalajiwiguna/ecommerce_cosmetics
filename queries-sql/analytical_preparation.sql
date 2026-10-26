@@ -141,43 +141,27 @@ FROM portofolio_2.mv_events_sessionized;
 --analytical_sessions   = 4,809,955
 --unique_users          = 1,638,714
 
---4. Session-splitting reconciliation
---Each inactivity gap > 30 minutes creates one additional analytical session.
+--4 Session-splitting reconciliation
 WITH ordered_events AS (
     SELECT
         user_session,
         user_id,
-        event_time AT TIME ZONE 'UTC' AS event_time_utc,
-        LAG(event_time AT TIME ZONE 'UTC')OVER(
-            PARTITION BY user_session, user_id ORDER BY event_time) AS previous_event_time
+        event_time_utc,
+        LAG(event_time_utc) OVER (
+            PARTITION BY user_session, user_id ORDER BY event_time_utc) AS previous_event_time
     FROM (
         SELECT DISTINCT
             user_session,
             user_id,
-            event_time
-        FROM portofolio_2.events
-        WHERE user_session IN (
-            SELECT user_session
-            FROM portofolio_2.mv_valid_sessions
-        )
-    )d
+            event_time_utc
+        FROM portofolio_2.vw_events_clean
+        WHERE is_valid_session = TRUE
+    ) d
 )
 SELECT
-    COUNT(*) FILTER (
-        WHERE previous_event_time IS NOT NULL
-          AND event_time_utc
-              - previous_event_time
-              > INTERVAL '30 minutes'
-    ) AS gaps_over_30_minutes
+    COUNT(*)FILTER WHERE previous_event_time IS NOT NULL AND event_time_utc - previous_event_time > INTERVAL '30 minutes') AS gaps_over_30_minutes
 FROM ordered_events;
-
-/*
-result observation:
--274,286 qualifying inactivity gaps
-
-Therefore:
-4,535,669 valid source sessions + 274,286 additional session splits = 4,809,955 analytical sessions
-*/
+--result observations: 274,286
 
 --5. Analytical-session integrity check
 --After sessionization, no consecutive timestamps inside one
