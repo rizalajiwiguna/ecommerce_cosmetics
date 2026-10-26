@@ -1,5 +1,4 @@
-/*E-COMMERCE COSMETICS — CUSTOMER JOURNEY, CONVERSION & RETENTION ANALYTICS
-2. DATA UNDERSTANDING
+/*
 A. Purpose:
 -Profile the raw dataset before any cleaning or analytical
 -transformation is applied.
