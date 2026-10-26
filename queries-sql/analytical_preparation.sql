@@ -183,3 +183,4 @@ SELECT
 FROM ordered_events
 WHERE previous_event_time IS NOT NULL
   AND event_time_utc - previous_event_time > INTERVAL '30 minutes';
+-- result observation: internal_gaps_over_30_minutes = 0
