@@ -1,7 +1,7 @@
 /*
 A. Purpose:
-Create the PostgreSQL schema and raw event table used
-throughout the BeautyCommerce analytical workflow.
+-Create the PostgreSQL schema and raw event table used
+=throughout the BeautyCommerce analytical workflow.
 
 B. Raw table grain:
 1 row = 1 recorded behavioral event
