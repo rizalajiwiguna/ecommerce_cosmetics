@@ -1,4 +1,3 @@
----=== E-COMMERCE COSMETIC — CUSTOMER JOURNEY, CONVERSION & RETENTION ANALYTICS===--
 /*
 A. Purpose:
 Create the PostgreSQL schema and raw event table used
