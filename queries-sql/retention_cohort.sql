@@ -246,162 +246,22 @@ ORDER BY cohort_month;
 
 
 -- ---------------------------------------------------------
--- 10.6 Retention long table
+-- 10.6 Observable retention long table
 -- ---------------------------------------------------------
-
-WITH cohort_size AS (
-    SELECT
-        cohort_month,
-
-        COUNT(DISTINCT user_id)
-            AS cohort_size
-
-    FROM portofolio_2.mv_customer_purchase_cohort
-
-    WHERE cohort_month_number = 0
-
-    GROUP BY cohort_month
-),
-
-retained AS (
-    SELECT
-        cohort_month,
-        cohort_month_number,
-
-        COUNT(DISTINCT user_id)
-            AS retained_customers
-
-    FROM portofolio_2.mv_customer_purchase_cohort
-
-    GROUP BY
-        cohort_month,
-        cohort_month_number
-)
-
-SELECT
-    r.cohort_month,
-    r.cohort_month_number,
-    c.cohort_size,
-    r.retained_customers,
-
-    ROUND(
-        100.0 * r.retained_customers
-        / NULLIF(c.cohort_size, 0),
-        2
-    ) AS retention_rate
-
-FROM retained r
-
-JOIN cohort_size c
-    ON r.cohort_month = c.cohort_month
-
-ORDER BY
-    r.cohort_month,
-    r.cohort_month_number;
-
-
--- ---------------------------------------------------------
--- 10.7 Retention cohort matrix
--- ---------------------------------------------------------
--- Months that are not yet observable remain NULL, not zero.
-
-WITH cohort_size AS (
-    SELECT
-        cohort_month,
-
-        COUNT(DISTINCT user_id)
-            AS cohort_size
-
-    FROM portofolio_2.mv_customer_purchase_cohort
-
-    WHERE cohort_month_number = 0
-
-    GROUP BY cohort_month
-),
-
-retention AS (
-    SELECT
-        cohort_month,
-        cohort_month_number,
-
-        COUNT(DISTINCT user_id)
-            AS retained_customers
-
-    FROM portofolio_2.mv_customer_purchase_cohort
-
-    GROUP BY
-        cohort_month,
-        cohort_month_number
-),
-
-rates AS (
-    SELECT
-        r.cohort_month,
-        r.cohort_month_number,
-
-        ROUND(
-            100.0 * r.retained_customers
-            / NULLIF(c.cohort_size, 0),
-            2
-        ) AS retention_rate
-
-    FROM retention r
-
-    JOIN cohort_size c
-        ON r.cohort_month = c.cohort_month
-)
-
-SELECT
-    cohort_month,
-
-    MAX(retention_rate)
-        FILTER (
-            WHERE cohort_month_number = 0
-        ) AS m0,
-
-    MAX(retention_rate)
-        FILTER (
-            WHERE cohort_month_number = 1
-        ) AS m1,
-
-    MAX(retention_rate)
-        FILTER (
-            WHERE cohort_month_number = 2
-        ) AS m2,
-
-    MAX(retention_rate)
-        FILTER (
-            WHERE cohort_month_number = 3
-        ) AS m3,
-
-    MAX(retention_rate)
-        FILTER (
-            WHERE cohort_month_number = 4
-        ) AS m4
-
-FROM rates
-
-GROUP BY cohort_month
-
-ORDER BY cohort_month;
-
--- Observed:
+-- Explicitly distinguishes:
 --
--- Oct: 100 | 18.49 | 12.78 | 13.19 | 10.45
--- Nov: 100 |  9.78 | 10.15 |  7.92 | NULL
--- Dec: 100 |  8.52 |  6.45 | NULL  | NULL
--- Jan: 100 |  8.86 | NULL  | NULL  | NULL
--- Feb: 100 | NULL  | NULL  | NULL  | NULL
+-- 0    = observable month with zero retained customers
+-- NULL = not observable beyond dataset window
 
+WITH dataset_boundary AS (
+    SELECT
+        MAX(purchase_month)
+            AS max_purchase_month
 
--- ---------------------------------------------------------
--- 10.8 Retention by observation maturity
--- ---------------------------------------------------------
--- Cohort composition differs at each maturity level.
--- These rates should NOT be interpreted as one continuous
--- retention curve.
+    FROM portofolio_2.mv_customer_purchase_cohort
+),
 
-WITH cohort_size AS (
+cohort_size AS (
     SELECT
         cohort_month,
 
@@ -415,6 +275,47 @@ WITH cohort_size AS (
     GROUP BY cohort_month
 ),
 
+observable_months AS (
+    SELECT
+        c.cohort_month,
+        c.cohort_size,
+
+        gs.cohort_month_number
+
+    FROM cohort_size c
+
+    CROSS JOIN dataset_boundary b
+
+    CROSS JOIN LATERAL
+        GENERATE_SERIES(
+            0,
+
+            (
+                (
+                    EXTRACT(
+                        YEAR FROM b.max_purchase_month
+                    )
+                    -
+                    EXTRACT(
+                        YEAR FROM c.cohort_month
+                    )
+                ) * 12
+
+                +
+
+                (
+                    EXTRACT(
+                        MONTH FROM b.max_purchase_month
+                    )
+                    -
+                    EXTRACT(
+                        MONTH FROM c.cohort_month
+                    )
+                )
+            )::int
+        ) AS gs(cohort_month_number)
+),
+
 retained AS (
     SELECT
         cohort_month,
@@ -425,50 +326,44 @@ retained AS (
 
     FROM portofolio_2.mv_customer_purchase_cohort
 
-    WHERE cohort_month_number > 0
-
     GROUP BY
         cohort_month,
         cohort_month_number
 )
 
 SELECT
-    r.cohort_month_number,
+    o.cohort_month,
+    o.cohort_month_number,
+    o.cohort_size,
 
-    SUM(r.retained_customers)
-        AS retained_customers,
-
-    SUM(c.cohort_size)
-        AS eligible_cohort_customers,
+    COALESCE(
+        r.retained_customers,
+        0
+    ) AS retained_customers,
 
     ROUND(
-        100.0 * SUM(r.retained_customers)
+        100.0 *
+        COALESCE(
+            r.retained_customers,
+            0
+        )
         / NULLIF(
-            SUM(c.cohort_size),
+            o.cohort_size,
             0
         ),
         2
-    ) AS weighted_retention_rate
+    ) AS retention_rate
 
-FROM retained r
+FROM observable_months o
 
-JOIN cohort_size c
-    ON r.cohort_month = c.cohort_month
+LEFT JOIN retained r
+    ON o.cohort_month = r.cohort_month
+   AND o.cohort_month_number
+       = r.cohort_month_number
 
-GROUP BY r.cohort_month_number
-
-ORDER BY r.cohort_month_number;
-
--- Observed:
--- M1 = 11.73%
--- M2 = 10.08%
--- M3 = 10.51%
--- M4 = 10.45%
---
--- Note:
--- M1 includes Oct–Jan cohorts.
--- M4 contains only the October cohort.
-
+ORDER BY
+    o.cohort_month,
+    o.cohort_month_number;
 
 -- ---------------------------------------------------------
 -- 10.9 New-observed vs returning buyers
