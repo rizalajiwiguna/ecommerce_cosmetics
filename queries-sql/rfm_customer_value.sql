@@ -39,240 +39,145 @@ SELECT
     SUM(valid_monetary_purchase_events) AS valid_monetary_purchase_events,
     ROUND(SUM(monetary_observed_value),2) AS total_monetary_observed_value
 FROM portofolio_2.mv_customer_rfm_base;
--- Observed:
--- customers                       = 110,500
--- unique_customers                = 110,500
--- min_recency_days                = 1
--- max_recency_days                = 152
--- total_purchase_sessions         = 157,573
--- total_purchase_events           = 1,286,898
--- valid_monetary_purchase_events  = 1,286,771
--- total_monetary_observed_value   = 6,351,305.66
+--Observed:
+--customers                       = 110,500
+--unique_customers                = 110,500
+--min_recency_days                = 1
+--max_recency_days                = 152
+--total_purchase_sessions         = 157,573
+--total_purchase_events           = 1,286,898
+--valid_monetary_purchase_events  = 1,286,771
+--total_monetary_observed_value   = 6,351,305.66
 
 --3 RFM distribution
 SELECT
     ROUND(
         PERCENTILE_CONT(0.25)
-        WITHIN GROUP (ORDER BY recency_days)::numeric,
-        0
-    ) AS p25_recency,
-    ROUND(
-        PERCENTILE_CONT(0.50)
-        WITHIN GROUP (ORDER BY recency_days)::numeric,
-        0
-    ) AS median_recency,
+        WITHIN GROUP(ORDER BY recency_days)::numeric,0) AS p25_recency,
+    ROUND(PERCENTILE_CONT(0.50)
+        WITHIN GROUP(ORDER BY recency_days)::numeric,0) AS median_recency,
     ROUND(
         PERCENTILE_CONT(0.75)
-        WITHIN GROUP (ORDER BY recency_days)::numeric,
-        0
-    ) AS p75_recency,
+        WITHIN GROUP(ORDER BY recency_days)::numeric,0) AS p75_recency,
     ROUND(
         PERCENTILE_CONT(0.90)
-        WITHIN GROUP (ORDER BY recency_days)::numeric,
-        0
-    ) AS p90_recency,
+        WITHIN GROUP(ORDER BY recency_days)::numeric,0) AS p90_recency,
     ROUND(
         PERCENTILE_CONT(0.25)
-        WITHIN GROUP (
-            ORDER BY frequency_purchase_sessions
-        )::numeric,
-        0
-    ) AS p25_frequency,
+        WITHIN GROUP(ORDER BY frequency_purchase_sessions)::numeric,0) AS p25_frequency,
     ROUND(
         PERCENTILE_CONT(0.50)
-        WITHIN GROUP (
-            ORDER BY frequency_purchase_sessions
-        )::numeric,
-        0
-    ) AS median_frequency,
+        WITHIN GROUP(ORDER BY frequency_purchase_sessions)::numeric,0) AS median_frequency,
     ROUND(
         PERCENTILE_CONT(0.75)
-        WITHIN GROUP (
-            ORDER BY frequency_purchase_sessions
-        )::numeric,
-        0
-    ) AS p75_frequency,
+        WITHIN GROUP(ORDER BY frequency_purchase_sessions)::numeric,0) AS p75_frequency,
     ROUND(
         PERCENTILE_CONT(0.90)
-        WITHIN GROUP (
-            ORDER BY frequency_purchase_sessions
-        )::numeric,
-        0
-    ) AS p90_frequency,
+        WITHIN GROUP(ORDER BY frequency_purchase_sessions)::numeric,0) AS p90_frequency,
     ROUND(
         PERCENTILE_CONT(0.95)
-        WITHIN GROUP (
-            ORDER BY frequency_purchase_sessions
-        )::numeric,
-        0
-    ) AS p95_frequency,
+        WITHIN GROUP(ORDER BY frequency_purchase_sessions)::numeric,0) AS p95_frequency,
     ROUND(
         PERCENTILE_CONT(0.25)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS p25_monetary,
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS p25_monetary,
     ROUND(
         PERCENTILE_CONT(0.50)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS median_monetary,
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS median_monetary,
     ROUND(
         PERCENTILE_CONT(0.75)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS p75_monetary,
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS p75_monetary,
     ROUND(
         PERCENTILE_CONT(0.90)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS p90_monetary,
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS p90_monetary,
     ROUND(
         PERCENTILE_CONT(0.95)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS p95_monetary
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS p95_monetary
 FROM portofolio_2.mv_customer_rfm_base;
--- Observed:
--- Recency P25 / P50 / P75 / P90 = 32 / 71 / 106 / 134
--- Frequency P25 / P50 / P75     = 1 / 1 / 1
--- Frequency P90 / P95           = 2 / 3
--- Monetary P25 / P50 / P75      = 16.28 / 33.22 / 61.58
--- Monetary P90 / P95            = 122.25 / 192.78
+--Observed:
+--Recency P25 / P50 / P75 / P90 = 32 / 71 / 106 / 134
+--Frequency P25 / P50 / P75     = 1 / 1 / 1
+--Frequency P90 / P95           = 2 / 3
+--Monetary P25 / P50 / P75      = 16.28 / 33.22 / 61.58
+--Monetary P90 / P95            = 122.25 / 192.78
 
 --4 Frequency distribution
 SELECT
     frequency_purchase_sessions,
     COUNT(*) AS customers,
-    ROUND(
-        100.0 * COUNT(*)
-        / SUM(COUNT(*)) OVER (),
-        2
-    ) AS customer_share_pct
+    ROUND(100.0 * COUNT(*)/ SUM(COUNT(*)) OVER (),2) AS customer_share_pct
 FROM portofolio_2.mv_customer_rfm_base
 GROUP BY frequency_purchase_sessions
 ORDER BY frequency_purchase_sessions
 LIMIT 15;
--- Key finding:
--- 1 purchase session = 78.27% of observed buyers.
--- Therefore frequency is NOT scored using NTILE(), because
--- doing so would split customers with identical frequency
--- across different scores.
+--Key finding:
+--1 purchase session = 78.27% of observed buyers.
+--Therefore frequency is NOT scored using NTILE(), because
+--doing so would split customers with identical frequency
+--across different scores.
 
 --5. R and M percentile thresholds
 SELECT
     ROUND(
         PERCENTILE_CONT(0.20)
-        WITHIN GROUP (ORDER BY recency_days)::numeric,
-        0
-    ) AS r_p20,
+        WITHIN GROUP(ORDER BY recency_days)::numeric,0) AS r_p20,
     ROUND(
         PERCENTILE_CONT(0.40)
-        WITHIN GROUP (ORDER BY recency_days)::numeric,
-        0
-    ) AS r_p40,
+        WITHIN GROUP(ORDER BY recency_days)::numeric,0) AS r_p40,
     ROUND(
         PERCENTILE_CONT(0.60)
-        WITHIN GROUP (ORDER BY recency_days)::numeric,
-        0
-    ) AS r_p60,
+        WITHIN GROUP(ORDER BY recency_days)::numeric,0) AS r_p60,
     ROUND(
         PERCENTILE_CONT(0.80)
-        WITHIN GROUP (ORDER BY recency_days)::numeric,
-        0
-    ) AS r_p80,
+        WITHIN GROUP(ORDER BY recency_days)::numeric,0) AS r_p80,
     ROUND(
         PERCENTILE_CONT(0.20)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS m_p20,
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS m_p20,
     ROUND(
         PERCENTILE_CONT(0.40)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS m_p40,
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS m_p40,
     ROUND(
         PERCENTILE_CONT(0.60)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS m_p60,
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS m_p60,
     ROUND(
         PERCENTILE_CONT(0.80)
-        WITHIN GROUP (
-            ORDER BY monetary_observed_value
-        )::numeric,
-        2
-    ) AS m_p80
+        WITHIN GROUP(ORDER BY monetary_observed_value)::numeric,2) AS m_p80
 FROM portofolio_2.mv_customer_rfm_base;
--- Observed:
--- R thresholds = 25 / 51 / 87 / 115 days
--- M thresholds = 14.20 / 24.96 / 41.92 / 74.44
+/*
+Observed:
+R thresholds = 25 / 51 / 87 / 115 days
+M thresholds = 14.20 / 24.96 / 41.92 / 74.44
 
---6 Tie-aware RFM scoring
+6 Tie-aware RFM scoring
+R: Lower recency is better.
+F:
+F1 = 1 purchase session
+F2 = 2
+F3 = 3
+F4 = 4–5
+F5 = 6+
+M:Higher historical observed value is better.
+*/
 
--- R:
--- Lower recency is better.
-
--- F:
--- F1 = 1 purchase session
--- F2 = 2
--- F3 = 3
--- F4 = 4–5
--- F5 = 6+
-
--- M:
--- Higher historical observed value is better.
 CREATE MATERIALIZED VIEW
     portofolio_2.mv_customer_rfm_scored AS
 WITH thresholds AS (
     SELECT
         PERCENTILE_CONT(0.20)
-            WITHIN GROUP (
-                ORDER BY recency_days
-            ) AS r_p20,
+            WITHIN GROUP(ORDER BY recency_days) AS r_p20,
         PERCENTILE_CONT(0.40)
-            WITHIN GROUP (
-                ORDER BY recency_days
-            ) AS r_p40,
+            WITHIN GROUP(ORDER BY recency_days) AS r_p40,
         PERCENTILE_CONT(0.60)
-            WITHIN GROUP (
-                ORDER BY recency_days
-            ) AS r_p60,
+            WITHIN GROUP(ORDER BY recency_days) AS r_p60,
         PERCENTILE_CONT(0.80)
-            WITHIN GROUP (
-                ORDER BY recency_days
-            ) AS r_p80,
+            WITHIN GROUP(ORDER BY recency_days) AS r_p80,
         PERCENTILE_CONT(0.20)
-            WITHIN GROUP (
-                ORDER BY monetary_observed_value
-            ) AS m_p20,
+            WITHIN GROUP(ORDER BY monetary_observed_value) AS m_p20,
         PERCENTILE_CONT(0.40)
-            WITHIN GROUP (
-                ORDER BY monetary_observed_value
-            ) AS m_p40,
+            WITHIN GROUP(ORDER BY monetary_observed_value) AS m_p40,
         PERCENTILE_CONT(0.60)
-            WITHIN GROUP (
-                ORDER BY monetary_observed_value
-            ) AS m_p60,
+            WITHIN GROUP(ORDER BY monetary_observed_value) AS m_p60,
         PERCENTILE_CONT(0.80)
-            WITHIN GROUP (
-                ORDER BY monetary_observed_value
-            ) AS m_p80
+            WITHIN GROUP(ORDER BY monetary_observed_value) AS m_p80
     FROM portofolio_2.mv_customer_rfm_base
 )
 SELECT
@@ -316,62 +221,49 @@ ANALYZE portofolio_2.mv_customer_rfm_scored;
 SELECT
     r_score,
     COUNT(*) AS customers,
-    ROUND(
-        100.0 * COUNT(*)
-        / SUM(COUNT(*)) OVER (),
-        2
-    ) AS customer_share_pct
+    ROUND(100.0 * COUNT(*)/ SUM(COUNT(*)) OVER (),2) AS customer_share_pct
 FROM portofolio_2.mv_customer_rfm_scored
-GROUP BY r_score
-ORDER BY r_score DESC;
+GROUP BY 1
+ORDER BY 1 DESC;
 
 -- R-score distribution ≈ 20% per group.
 SELECT
     f_score,
     COUNT(*) AS customers,
-    ROUND(
-        100.0 * COUNT(*)
-        / SUM(COUNT(*)) OVER (),
-        2
-    ) AS customer_share_pct
+    ROUND(100.0 * COUNT(*)/ SUM(COUNT(*)) OVER (),2) AS customer_share_pct
 FROM portofolio_2.mv_customer_rfm_scored
-GROUP BY f_score
-ORDER BY f_score DESC;
--- Observed:
--- F1 = 78.27%
--- F2 = 12.97%
--- F3 =  4.34%
--- F4 =  2.95%
--- F5 =  1.47%
+GROUP BY 1
+ORDER BY 1 DESC;
+--Observed:
+--F1 = 78.27%
+--F2 = 12.97%
+--F3 =  4.34%
+--F4 =  2.95%
+--F5 =  1.47%
 
 SELECT
     m_score,
     COUNT(*) AS customers,
-    ROUND(
-        100.0 * COUNT(*)
-        / SUM(COUNT(*)) OVER (),
-        2
-    ) AS customer_share_pct
+    ROUND(100.0 * COUNT(*)/ SUM(COUNT(*)) OVER (),2) AS customer_share_pct
 FROM portofolio_2.mv_customer_rfm_scored
 GROUP BY m_score
 ORDER BY m_score DESC;
--- M-score distribution ≈ 20% per group.
-
---8. Business-oriented RFM bands
--- Recency:
--- Recent = R4–R5
--- Mid    = R2–R3
--- Stale  = R1
-
--- Frequency:
--- One-Time       = F1
--- Repeat         = F2–F3
--- High Frequency = F4–F5
-
--- Monetary:
--- Low Value  = M1
--- Mid Value  = M2–M3
--- High Value = M4–M5
+/*
+M-score distribution ≈ 20% per group.
+Business-oriented RFM bands
+Recency:
+-Recent = R4–R5
+-Mid    = R2–R3
+-Stale  = R1
+Frequency:
+-One-Time       = F1
+-Repeat         = F2–F3
+-High Frequency = F4–F5
+Monetary:
+-Low Value  = M1
+-Mid Value  = M2–M3
+-High Value = M4–M5
+*/
 
 --9. Final RFM segmentation
 CREATE MATERIALIZED VIEW
@@ -448,68 +340,30 @@ ANALYZE portofolio_2.mv_customer_rfm_segment;
 SELECT
     rfm_segment,
     COUNT(*) AS customers,
-    ROUND(
-        100.0 * COUNT(*)
-        / SUM(COUNT(*)) OVER (),
-        2
-    ) AS customer_share_pct,
-    ROUND(
-        SUM(monetary_observed_value),
-        2
-    ) AS observed_purchase_value,
-    ROUND(
-        100.0 * SUM(monetary_observed_value)
-        / SUM(
-            SUM(monetary_observed_value)
-        ) OVER (),
-        2
-    ) AS value_share_pct,
-    ROUND(
-        AVG(monetary_observed_value),
-        2
-    ) AS avg_observed_value,
-    ROUND(
-        AVG(recency_days),
-        2
-    ) AS avg_recency_days,
-    ROUND(
-        AVG(frequency_purchase_sessions),
-        2
-    ) AS avg_purchase_sessions
+    ROUND(100.0 * COUNT(*)/ SUM(COUNT(*)) OVER (),2) AS customer_share_pct,
+    ROUND(SUM(monetary_observed_value),2) AS observed_purchase_value,
+    ROUND(100.0 * SUM(monetary_observed_value)/ SUM(SUM(monetary_observed_value)) OVER (),2) AS value_share_pct,
+    ROUND(AVG(monetary_observed_value),2) AS avg_observed_value,
+    ROUND(AVG(recency_days),2) AS avg_recency_days,
+    ROUND(AVG(frequency_purchase_sessions),2) AS avg_purchase_sessions
 FROM portofolio_2.mv_customer_rfm_segment
 GROUP BY rfm_segment
 ORDER BY observed_purchase_value DESC;
--- Observed:
--- Loyal High-Value
--- 14,029 customers | 27.56% value
+/*
+-Loyal High-Value: 14,029 customers | 27.56% value
+-Champions: 4,035 customers | 17.81% value
+-Cooling High-Value: 10,541 customers | 12.86% value
+-Recent High-Value: 8,790 customers | 10.93% value
+-Needs Attention: 28,057 customers | 9.22% value
+-At Risk High-Value: 6,824 customers | 9.12% value
+-Promising: 23,742 customers | 7.79% value
+-Dormant Low/Mid Value: 14,482 customers | 4.69% value
 
--- Champions
--- 4,035 customers | 17.81% value
-
--- Cooling High-Value
--- 10,541 customers | 12.86% value
-
--- Recent High-Value
--- 8,790 customers | 10.93% value
-
--- Needs Attention
--- 28,057 customers | 9.22% value
-
--- At Risk High-Value
--- 6,824 customers | 9.12% value
-
--- Promising
--- 23,742 customers | 7.79% value
-
--- Dormant Low/Mid Value
--- 14,482 customers | 4.69% value
-
-
--- BUSINESS INTERPRETATION
--- Champions + Loyal High-Value:
--- 16.35% of customers
--- 45.37% of historical Observed Purchase Value.
-
--- Customer value is therefore materially concentrated.
--- RFM labels are descriptive operational segments.
--- They are NOT churn predictions or CLV forecasts.
+BUSINESS INTERPRETATION
+-Champions + Loyal High-Value:
+-16.35% of customers
+-45.37% of historical Observed Purchase Value.
+-Customer value is therefore materially concentrated.
+-RFM labels are descriptive operational segments.
+-They are NOT churn predictions or CLV forecasts.
+*/
