@@ -39,7 +39,6 @@ SELECT
     SUM(valid_monetary_purchase_events) AS valid_monetary_purchase_events,
     ROUND(SUM(monetary_observed_value),2) AS total_monetary_observed_value
 FROM portofolio_2.mv_customer_rfm_base;
---Observed:
 --customers                       = 110,500
 --unique_customers                = 110,500
 --min_recency_days                = 1
